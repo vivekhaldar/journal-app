@@ -14,14 +14,14 @@ This document records the initial deployment of the journal app to GCP.
 - **Firebase Console**: https://console.firebase.google.com/project/journal-app-vh
 
 ### Firebase Configuration
+Firebase configuration is stored in **Secret Manager** under `firebase-web-config`.
+
+To retrieve it locally:
+```bash
+gcloud secrets versions access latest --secret=firebase-web-config --project=journal-app-vh
 ```
-NEXT_PUBLIC_FIREBASE_API_KEY=AIzaSyByESAVaqQg0oF_LFVusttbgUuc4OrGWbg
-NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=journal-app-vh.firebaseapp.com
-NEXT_PUBLIC_FIREBASE_PROJECT_ID=journal-app-vh
-NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=journal-app-vh.firebasestorage.app
-NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=913560569160
-NEXT_PUBLIC_FIREBASE_APP_ID=1:913560569160:web:9f7ee22d7709665131df7d
-```
+
+Copy the output to `.env.local` for local development.
 
 ### Cloud Run Service
 - **Service URL**: https://journal-app-913560569160.us-central1.run.app
@@ -41,7 +41,7 @@ NEXT_PUBLIC_FIREBASE_APP_ID=1:913560569160:web:9f7ee22d7709665131df7d
 
 2. **Linked billing account**
    ```bash
-   gcloud billing projects link journal-app-vh --billing-account=01F59E-8E38DD-76CA23
+   gcloud billing projects link journal-app-vh --billing-account=<BILLING_ACCOUNT_ID>
    ```
 
 3. **Added Firebase to project**
@@ -57,6 +57,7 @@ NEXT_PUBLIC_FIREBASE_APP_ID=1:913560569160:web:9f7ee22d7709665131df7d
      run.googleapis.com \
      cloudbuild.googleapis.com \
      artifactregistry.googleapis.com \
+     secretmanager.googleapis.com \
      --project journal-app-vh
    ```
 
@@ -75,16 +76,14 @@ NEXT_PUBLIC_FIREBASE_APP_ID=1:913560569160:web:9f7ee22d7709665131df7d
    firebase deploy --only firestore:rules --project journal-app-vh
    ```
 
-8. **Initialized Identity Platform and authorized domains**
-   - Authorized domains: localhost, journal-app-vh.firebaseapp.com, journal-app-vh.web.app, journal-app-913560569160.us-central1.run.app
+8. **Stored Firebase config in Secret Manager**
+   ```bash
+   gcloud secrets create firebase-web-config --data-file=- --project=journal-app-vh
+   ```
 
 9. **Deployed to Cloud Run**
    ```bash
-   gcloud run deploy journal-app \
-     --source . \
-     --region us-central1 \
-     --project journal-app-vh \
-     --allow-unauthenticated
+   gcloud builds submit --config cloudbuild.yaml --project journal-app-vh
    ```
 
 ## Manual Step Required
@@ -101,10 +100,8 @@ NEXT_PUBLIC_FIREBASE_APP_ID=1:913560569160:web:9f7ee22d7709665131df7d
 To redeploy after code changes:
 
 ```bash
-gcloud run deploy journal-app \
-  --source . \
-  --region us-central1 \
-  --project journal-app-vh
+cd ~/repos/gh/journal-app
+gcloud builds submit --config cloudbuild.yaml --project journal-app-vh --substitutions=COMMIT_SHA=$(git rev-parse HEAD)
 ```
 
 ## Costs
@@ -113,3 +110,4 @@ At current usage (development/testing), all services should remain within free t
 - Cloud Run: 2M requests/month free
 - Firestore: 50K reads/day, 20K writes/day free
 - Firebase Auth: Unlimited for social auth
+- Secret Manager: 6 active secret versions free
