@@ -2,59 +2,51 @@
 # ABOUTME: Reads Firebase config from Secret Manager and passes to Docker build.
 
 steps:
-  # Step 1: Fetch secret and save to file (using cloud-sdk which has gcloud)
+  # Build and push using cloud-sdk (which has both gcloud and docker)
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: 'bash'
     args:
       - '-c'
       - |
-        gcloud secrets versions access latest --secret=firebase-web-config --project=$PROJECT_ID > /workspace/firebase-config.env
-        echo "Secret fetched successfully"
-        cat /workspace/firebase-config.env
+        set -ex
 
-  # Step 2: Build Docker image using the fetched config
-  - name: 'gcr.io/cloud-builders/docker'
-    entrypoint: 'bash'
-    args:
-      - '-c'
-      - |
-        # Source the config file
-        export $(cat /workspace/firebase-config.env | xargs)
+        # Fetch secret
+        gcloud secrets versions access latest --secret=firebase-web-config --project=$PROJECT_ID > /tmp/config.env
+        echo "=== Config fetched ==="
+        cat /tmp/config.env
 
+        # Parse values
+        API_KEY=$(grep NEXT_PUBLIC_FIREBASE_API_KEY /tmp/config.env | cut -d'=' -f2)
+        AUTH_DOMAIN=$(grep NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN /tmp/config.env | cut -d'=' -f2)
+        FB_PROJECT_ID=$(grep NEXT_PUBLIC_FIREBASE_PROJECT_ID /tmp/config.env | cut -d'=' -f2)
+        STORAGE_BUCKET=$(grep NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET /tmp/config.env | cut -d'=' -f2)
+        MESSAGING_ID=$(grep NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID /tmp/config.env | cut -d'=' -f2)
+        APP_ID=$(grep NEXT_PUBLIC_FIREBASE_APP_ID /tmp/config.env | cut -d'=' -f2)
+
+        echo "API_KEY=$$API_KEY"
+        echo "AUTH_DOMAIN=$$AUTH_DOMAIN"
+
+        # Build Docker image
         docker build \
-          --build-arg NEXT_PUBLIC_FIREBASE_API_KEY="$$NEXT_PUBLIC_FIREBASE_API_KEY" \
-          --build-arg NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN="$$NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN" \
-          --build-arg NEXT_PUBLIC_FIREBASE_PROJECT_ID="$$NEXT_PUBLIC_FIREBASE_PROJECT_ID" \
-          --build-arg NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET="$$NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET" \
-          --build-arg NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID="$$NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID" \
-          --build-arg NEXT_PUBLIC_FIREBASE_APP_ID="$$NEXT_PUBLIC_FIREBASE_APP_ID" \
+          --build-arg "NEXT_PUBLIC_FIREBASE_API_KEY=$$API_KEY" \
+          --build-arg "NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=$$AUTH_DOMAIN" \
+          --build-arg "NEXT_PUBLIC_FIREBASE_PROJECT_ID=$$FB_PROJECT_ID" \
+          --build-arg "NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=$$STORAGE_BUCKET" \
+          --build-arg "NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=$$MESSAGING_ID" \
+          --build-arg "NEXT_PUBLIC_FIREBASE_APP_ID=$$APP_ID" \
           -t us-central1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/journal-app:$COMMIT_SHA \
           -t us-central1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/journal-app:latest \
           .
 
-  # Push the image to Artifact Registry
-  - name: 'gcr.io/cloud-builders/docker'
-    args:
-      - 'push'
-      - 'us-central1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/journal-app:$COMMIT_SHA'
+        # Push images
+        docker push us-central1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/journal-app:$COMMIT_SHA
+        docker push us-central1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/journal-app:latest
 
-  - name: 'gcr.io/cloud-builders/docker'
-    args:
-      - 'push'
-      - 'us-central1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/journal-app:latest'
-
-  # Deploy to Cloud Run
-  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-    entrypoint: gcloud
-    args:
-      - 'run'
-      - 'deploy'
-      - 'journal-app'
-      - '--image'
-      - 'us-central1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/journal-app:$COMMIT_SHA'
-      - '--region'
-      - 'us-central1'
-      - '--allow-unauthenticated'
+        # Deploy to Cloud Run
+        gcloud run deploy journal-app \
+          --image us-central1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/journal-app:$COMMIT_SHA \
+          --region us-central1 \
+          --allow-unauthenticated
 
 images:
   - 'us-central1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/journal-app:$COMMIT_SHA'
