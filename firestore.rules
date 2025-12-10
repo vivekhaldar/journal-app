@@ -1,0 +1,23 @@
+rules_version = '2';
+
+// ABOUTME: Firestore security rules for the journal app.
+// ABOUTME: Ensures users can only access their own entries.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Entries collection: users can only read/write their own entries
+    match /entries/{entryId} {
+      // Allow read if the user is authenticated and owns the entry
+      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+
+      // Allow create if the user is authenticated and setting their own userId
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+
+      // Allow delete if the user is authenticated and owns the entry
+      allow delete: if request.auth != null && resource.data.userId == request.auth.uid;
+
+      // Disallow updates (entries are immutable once created)
+      allow update: if false;
+    }
+  }
+}

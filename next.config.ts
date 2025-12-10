@@ -1,7 +1,10 @@
+// ABOUTME: Next.js configuration file.
+// ABOUTME: Enables standalone output for Docker deployment to Cloud Run.
+
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  output: "standalone",
 };
 
 export default nextConfig;
