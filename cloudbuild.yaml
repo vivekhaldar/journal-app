@@ -2,30 +2,32 @@
 # ABOUTME: Reads Firebase config from Secret Manager and passes to Docker build.
 
 steps:
-  # Build the Docker image with Firebase config from Secret Manager
+  # Step 1: Fetch secret and save to file (using cloud-sdk which has gcloud)
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        gcloud secrets versions access latest --secret=firebase-web-config --project=$PROJECT_ID > /workspace/firebase-config.env
+        echo "Secret fetched successfully"
+        cat /workspace/firebase-config.env
+
+  # Step 2: Build Docker image using the fetched config
   - name: 'gcr.io/cloud-builders/docker'
     entrypoint: 'bash'
     args:
       - '-c'
       - |
-        # Read secret and parse into build args
-        SECRET=$(gcloud secrets versions access latest --secret=firebase-web-config --project=$PROJECT_ID)
-
-        # Parse each line and build the args
-        API_KEY=$(echo "$$SECRET" | grep NEXT_PUBLIC_FIREBASE_API_KEY | cut -d'=' -f2)
-        AUTH_DOMAIN=$(echo "$$SECRET" | grep NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN | cut -d'=' -f2)
-        PROJECT_ID_FB=$(echo "$$SECRET" | grep NEXT_PUBLIC_FIREBASE_PROJECT_ID | cut -d'=' -f2)
-        STORAGE_BUCKET=$(echo "$$SECRET" | grep NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET | cut -d'=' -f2)
-        MESSAGING_SENDER_ID=$(echo "$$SECRET" | grep NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID | cut -d'=' -f2)
-        APP_ID=$(echo "$$SECRET" | grep NEXT_PUBLIC_FIREBASE_APP_ID | cut -d'=' -f2)
+        # Source the config file
+        export $(cat /workspace/firebase-config.env | xargs)
 
         docker build \
-          --build-arg NEXT_PUBLIC_FIREBASE_API_KEY="$$API_KEY" \
-          --build-arg NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN="$$AUTH_DOMAIN" \
-          --build-arg NEXT_PUBLIC_FIREBASE_PROJECT_ID="$$PROJECT_ID_FB" \
-          --build-arg NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET="$$STORAGE_BUCKET" \
-          --build-arg NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID="$$MESSAGING_SENDER_ID" \
-          --build-arg NEXT_PUBLIC_FIREBASE_APP_ID="$$APP_ID" \
+          --build-arg NEXT_PUBLIC_FIREBASE_API_KEY="$$NEXT_PUBLIC_FIREBASE_API_KEY" \
+          --build-arg NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN="$$NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN" \
+          --build-arg NEXT_PUBLIC_FIREBASE_PROJECT_ID="$$NEXT_PUBLIC_FIREBASE_PROJECT_ID" \
+          --build-arg NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET="$$NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET" \
+          --build-arg NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID="$$NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID" \
+          --build-arg NEXT_PUBLIC_FIREBASE_APP_ID="$$NEXT_PUBLIC_FIREBASE_APP_ID" \
           -t us-central1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/journal-app:$COMMIT_SHA \
           -t us-central1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/journal-app:latest \
           .
