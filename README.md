@@ -82,6 +82,7 @@ Emulator UI: [http://localhost:4000](http://localhost:4000)
 
 ```
 src/
+├── __tests__/           # Unit tests
 ├── app/                 # Next.js App Router pages
 ├── components/          # React components
 │   ├── ui/             # shadcn/ui base components
@@ -113,6 +114,47 @@ npm run lint
 ```bash
 npx tsc --noEmit
 ```
+
+### Testing
+
+The project uses Jest and React Testing Library for unit testing.
+
+**Run all tests:**
+```bash
+npm test
+```
+
+**Run tests in watch mode (re-runs on file changes):**
+```bash
+npm run test:watch
+```
+
+**Run tests with coverage report:**
+```bash
+npm run test:coverage
+```
+
+**Test coverage:**
+- Components: ~99% line coverage
+- Library functions: 100% line coverage
+- Overall: ~86% line coverage
+
+**Test files location:**
+```
+src/__tests__/
+├── auth.test.tsx        # AuthProvider and useAuth hook tests
+├── entries.test.ts      # Firestore CRUD operations tests
+├── entry-form.test.tsx  # EntryForm component tests
+├── entry-list.test.tsx  # EntryList component tests
+└── header.test.tsx      # Header component tests
+```
+
+**What's tested:**
+- Authentication state management and Google Sign-In flow
+- Entry creation, listing, and deletion
+- Component rendering in different auth states
+- User interactions (form submission, button clicks)
+- Error handling
 
 ## Deployment to Cloud Run
 
